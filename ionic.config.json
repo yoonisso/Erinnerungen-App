@@ -1,0 +1,7 @@
+{
+  "name": "Erinnerungen-App",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
