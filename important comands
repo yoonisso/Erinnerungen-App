@@ -3,3 +3,6 @@
 npx cap open ios
 ionic cap sync
 ionic build
+
+ionic cap run ios --target="RESULT FROM --list"
+npx cap sync
