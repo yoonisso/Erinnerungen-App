@@ -1,4 +1,5 @@
 --- file to show important cli commands for development ---
+ionic serve
 
 npx cap open ios
 ionic cap sync
