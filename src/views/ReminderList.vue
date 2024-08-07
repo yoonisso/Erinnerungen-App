@@ -14,8 +14,9 @@
             <h2>{{ reminder.text }}</h2>
             <p>{{ formatDateTime(reminder.date, reminder.time) }}</p>
           </ion-label>
-          <ion-button @click="scheduleNotification(reminder.id)" fill="outline" slot="end">Bearbeiten</ion-button>
+          <ion-button @click="editReminder()" fill="outline" slot="end">Bearbeiten</ion-button>
           <ion-button @click="deleteReminder(reminder.id)" color="danger" slot="end">Löschen</ion-button>
+          <ion-button @click="scheduleNotification(reminder.id)" fill="outline" slot="end">SheduleTestButton</ion-button>
         </ion-item>
       </ion-list>
 
@@ -31,7 +32,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonButton, IonFab, IonFabButton, IonIcon } from '@ionic/vue';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonButton, IonFab, IonFabButton, IonIcon, alertController } from '@ionic/vue';
 import { add } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -43,8 +44,18 @@ const reminders = ref([
 ]);
 
 const scheduleNotification = async (id: number) => {
+  const { display } = await LocalNotifications.checkPermissions();
+  if (display !== 'granted') {
+    const alert = await alertController.create({
+      header: 'Berechtigung erforderlich!',
+      message: 'Mitteilung kann nicht erstellt werden, da die Berechtigung fehlt.',
+      buttons: ['OK']
+    });
+    await alert.present();
+    return;
+  }
+
   try {
-    await LocalNotifications.requestPermissions(); //TODO nicht bei Bearbeiten sondern bei erstem Appstart einfügen
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -75,6 +86,10 @@ const addReminder = () => {
   saveReminders();
 };
 
+const editReminder = () => {
+  //Modal view open
+};
+
 const formatDateTime = (date: string, time: string) => {
   return `${date} ${time}`;
 };
@@ -90,7 +105,19 @@ const saveReminders = async () => {
   await Preferences.set({ key: 'reminders', value: JSON.stringify(reminders.value) });
 };
 
+const requestNotificationPermissons = async () => {
+  try {
+    const { display } = await LocalNotifications.checkPermissions();
+    if (display !== 'granted') {
+      await LocalNotifications.requestPermissions();
+    }
+  } catch (error) {
+    console.error('Fehler beim Anfordern der Berechtigungen: ', error);
+  }
+}
+
 onMounted(() => {
+  requestNotificationPermissons();
   loadReminders();
 });
 
