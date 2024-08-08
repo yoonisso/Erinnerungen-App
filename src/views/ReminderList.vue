@@ -7,6 +7,7 @@
     </ion-header>
 
     <ion-content>
+      
       <!-- Reminder List -->
       <ion-list>
         <ion-item v-for="reminder in reminders" :key="reminder.id">
@@ -14,18 +15,27 @@
             <h2>{{ reminder.text }}</h2>
             <p>{{ formatDateTime(reminder.date, reminder.time) }}</p>
           </ion-label>
-          <ion-button @click="editReminder()" fill="outline" slot="end">Bearbeiten</ion-button>
+          <ion-button @click="openEditReminderModal(reminder)" fill="outline" slot="end">Bearbeiten</ion-button>
           <ion-button @click="deleteReminder(reminder.id)" color="danger" slot="end">Löschen</ion-button>
-          <ion-button @click="scheduleNotification(reminder.id)" fill="outline" slot="end">SheduleTestButton</ion-button>
         </ion-item>
       </ion-list>
 
       <!-- Create new Reminder -->
       <ion-fab vertical="bottom" horizontal="center" slot="fixed">
-        <ion-fab-button @click="addReminder">
+        <ion-fab-button @click="openAddReminderModal">
           <ion-icon :icon="add"></ion-icon>
         </ion-fab-button>
       </ion-fab>
+
+      <!-- Reminder Modal -->
+      <ReminderModal 
+        v-if="showModal"
+        :reminder="currentReminder"
+        :isEditing="isEditing"
+        :showModal="showModal"
+        @save="handleSaveReminder"
+        @dismiss="dismissModal"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -36,73 +46,47 @@ import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem,
 import { add } from 'ionicons/icons';
 import { Preferences } from '@capacitor/preferences';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import ReminderModal from './ReminderModal.vue';
 
-const reminders = ref([
-  // Beispiel-Daten
-  { id: 1, text: 'Erinnerung 1', date: '2024-08-05', time: '10:00' },
-  { id: 2, text: 'Erinnerung 2', date: '2024-08-06', time: '14:00' }
-]);
+interface Reminder {
+  id: number;
+  text: string;
+  date: string;
+  time: string;
+}
 
-const scheduleNotification = async (id: number) => {
-  const { display } = await LocalNotifications.checkPermissions();
-  if (display !== 'granted') {
-    const alert = await alertController.create({
-      header: 'Berechtigung erforderlich!',
-      message: 'Mitteilung kann nicht erstellt werden, da die Berechtigung fehlt.',
-      buttons: ['OK']
-    });
-    await alert.present();
-    return;
-  }
+const reminders = ref<Reminder[]>([]);
+const showModal = ref(false);
+const currentReminder = ref<Reminder | undefined>(undefined);
+const isEditing = ref(false);
 
-  try {
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          title: "Title",
-          body: "Body",
-          id,
-          schedule: { at: new Date(Date.now() + 1000 * 5) }, // In 5 Sekunden
-          sound: undefined,
-          attachments: undefined,
-          actionTypeId: "",
-          extra: null
-        }
-      ]
-    });
-  } catch (error) {
-    console.error('Fehler bei der Planung der Benachrichtigung: ' , error);
-  }
-};
-
-const deleteReminder = (id: number) => {
-  reminders.value = reminders.value.filter(reminder => reminder.id !== id);
-  saveReminders();
-};
-
-const addReminder = () => {
-  const newId = reminders.value.length ? Math.max(...reminders.value.map(r => r.id)) + 1 : 1;
-  reminders.value.push({ id: newId, text: `Erinnerung ${newId}`, date: '2024-08-07', time: '12:00' });
-  saveReminders();
-};
-
-const editReminder = () => {
-  //Modal view open
-};
-
-const formatDateTime = (date: string, time: string) => {
-  return `${date} ${time}`;
-};
+onMounted(() => {
+  requestNotificationPermissons();
+  loadReminders();
+});
 
 const loadReminders = async () => {
-  const { value } = await Preferences.get({ key: 'reminders' });
-  if (value) {
-    reminders.value = JSON.parse(value);
+  try {
+    const { value } = await Preferences.get({ key: 'reminders' });
+    if (value) {
+      reminders.value = JSON.parse(value);
+    } 
+  } catch (error) {
+    console.error('Fehler beim Laden der Erinnerungen: ', error);
   }
 };
 
 const saveReminders = async () => {
-  await Preferences.set({ key: 'reminders', value: JSON.stringify(reminders.value) });
+  try {
+    await Preferences.set({ key: 'reminders', value: JSON.stringify(reminders.value) });
+  } catch (error) {
+    console.error('Fehler bei der Speicherung der Erinnerungen: ', error);
+  }
+};
+
+const deleteReminder = async (id: number) => {
+  reminders.value = reminders.value.filter(reminder => reminder.id !== id);
+  await saveReminders();
 };
 
 const requestNotificationPermissons = async () => {
@@ -116,10 +100,96 @@ const requestNotificationPermissons = async () => {
   }
 }
 
-onMounted(() => {
-  requestNotificationPermissons();
-  loadReminders();
-});
+const scheduleNotification = async (reminder: Reminder) => {
+  const { display } = await LocalNotifications.checkPermissions();
+  if (display !== 'granted') {
+    const alert = await alertController.create({
+      header: 'Berechtigung erforderlich!',
+      message: 'Um eine Benachrichtigung zu erhalten, muss die Berechtigung vergeben werden.',
+      buttons: ['OK']
+    });
+    await alert.present();
+    return;
+  }
+
+  try {
+    //check following date
+    const [year, month, day] = reminder.date.split('-').map(Number);
+    const [hours, minutes] = reminder.time.split(':').map(Number);
+    const reminderDate = new Date(year, month - 1, day, hours, minutes);
+    
+    //TestAlert
+    const alert = await alertController.create({
+      header: 'Test of Date',
+      message: 'Date' + reminderDate,
+      buttons: ['OK']
+      });
+      await alert.present();
+    
+    if (reminderDate < new Date()) {
+      const alert = await alertController.create({
+      header: 'Datum liegt in der Vergangenheit!',
+      message: 'Es können nur Benachrichtigungen für die Zukunft erstellt werden.',
+      buttons: ['OK']
+      });
+      await alert.present();
+      return;
+    }
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          title: reminder.text,
+          body: `Erinnerung: ${reminder.text} ist fällig.`,
+          id: reminder.id,
+          schedule: { at: reminderDate },
+          sound: undefined,
+          attachments: undefined,
+          actionTypeId: "",
+          extra: null
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('Fehler bei der Planung der Benachrichtigung: ' , error);
+  }
+};
+
+const openAddReminderModal = (reminder: Reminder) => {
+  currentReminder.value = { ...reminder };
+  isEditing.value = false;
+  showModal.value = true;
+}
+
+const openEditReminderModal = (reminder: Reminder) => {
+  currentReminder.value = { ...reminder};
+  isEditing.value = true;
+  showModal.value = true;
+}
+
+const dismissModal = () => {
+  showModal.value = false;
+}
+
+const formatDateTime = (date: string, time: string) => {
+  return `${date} ${time}`;
+};
+
+const handleSaveReminder = (reminder: Reminder) => {
+  if (isEditing.value) {
+    const index = reminders.value.findIndex(r => r.id === reminder.id);
+    if (index !== -1) {
+      reminders.value[index] = reminder;
+    }
+  } else {
+    reminders.value.push(reminder);
+    if (reminder.date && reminder.time) {
+      scheduleNotification(reminder);
+    } 
+  } 
+  saveReminders();
+  dismissModal(); 
+};
 
 </script>
 
