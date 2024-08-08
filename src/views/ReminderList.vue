@@ -7,6 +7,17 @@
     </ion-header>
 
     <ion-content>
+
+      <!-- Reminder Modal -->
+      <ReminderModal
+        v-if="showModal"
+        :reminder="currentReminder"
+        :isEditing="isEditing"
+        :showModal="showModal"
+        :existingIds="existingIds"
+        @save="handleSaveReminder"
+        @dismiss="dismissModal"
+      />
       
       <!-- Reminder List -->
       <ion-list>
@@ -27,15 +38,6 @@
         </ion-fab-button>
       </ion-fab>
 
-      <!-- Reminder Modal -->
-      <ReminderModal 
-        v-if="showModal"
-        :reminder="currentReminder"
-        :isEditing="isEditing"
-        :showModal="showModal"
-        @save="handleSaveReminder"
-        @dismiss="dismissModal"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -59,6 +61,7 @@ const reminders = ref<Reminder[]>([]);
 const showModal = ref(false);
 const currentReminder = ref<Reminder | undefined>(undefined);
 const isEditing = ref(false);
+const existingIds = ref<number[]>([]);
 
 onMounted(() => {
   requestNotificationPermissons();
@@ -70,6 +73,7 @@ const loadReminders = async () => {
     const { value } = await Preferences.get({ key: 'reminders' });
     if (value) {
       reminders.value = JSON.parse(value);
+      existingIds.value = reminders.value.map(reminder => reminder.id);
     } 
   } catch (error) {
     console.error('Fehler beim Laden der Erinnerungen: ', error);
@@ -86,6 +90,7 @@ const saveReminders = async () => {
 
 const deleteReminder = async (id: number) => {
   reminders.value = reminders.value.filter(reminder => reminder.id !== id);
+  existingIds.value = reminders.value.map(reminder => reminder.id);
   await saveReminders();
 };
 
@@ -155,8 +160,8 @@ const scheduleNotification = async (reminder: Reminder) => {
   }
 };
 
-const openAddReminderModal = (reminder: Reminder) => {
-  currentReminder.value = { ...reminder };
+const openAddReminderModal = () => {
+  currentReminder.value = undefined;
   isEditing.value = false;
   showModal.value = true;
 }
@@ -183,6 +188,7 @@ const handleSaveReminder = (reminder: Reminder) => {
     }
   } else {
     reminders.value.push(reminder);
+    existingIds.value.push(reminder.id);
     if (reminder.date && reminder.time) {
       scheduleNotification(reminder);
     } 

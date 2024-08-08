@@ -11,7 +11,7 @@
   
       <ion-content>
         <ion-item>
-          <ion-label position="stacked">Text</ion-label>
+          <ion-label position="stacked">Erinnerung</ion-label>
           <ion-input v-model="reminder.text" placeholder="Erinnerungstext eingeben"></ion-input>
         </ion-item>
         <ion-item>
@@ -40,11 +40,15 @@
     date: string;
     time: string;
   }
+
+  const formattedDate = ref('');
+  const formattedTime = ref('');
   
   const props = defineProps<{
     reminder?: Reminder | undefined;
     isEditing: boolean;
     showModal: boolean;
+    existingIds: number[];
   }>();
   
   const emit = defineEmits<{
@@ -54,7 +58,7 @@
   
   const modal = ref<HTMLIonModalElement | null>(null);
   const reminder = ref<Reminder>({
-    id: 1, //TODO add Check that not two reminders with same value
+    id: 0,
     text: '',
     date: '',
     time: ''
@@ -63,11 +67,18 @@
   watch(() => props.reminder, (newVal) => {
     if (newVal) {
       reminder.value = { ...newVal };
+      formattedDate.value = reminder.value.date;
+      formattedTime.value = reminder.value.time;
     }
   }, { immediate: true });
-  
-  const formattedDate = ref('');
-  const formattedTime = ref('');
+
+  const generateReminderId = (): number => {
+    let id: number;
+    do {
+      id = Math.floor(Math.random() * 1000000);
+    } while (props.existingIds.includes(id));
+    return id;
+  }
   
   const selectDate = async () => {
     const date = new Date(reminder.value.date || Date.now());
@@ -106,6 +117,9 @@
   };
   
   const saveReminder = () => {
+    if (!props.isEditing) {
+      reminder.value.id = generateReminderId();
+    }
     emit('save', reminder.value);
     dismissModal();
   };
