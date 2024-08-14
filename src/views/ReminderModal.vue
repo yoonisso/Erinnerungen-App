@@ -1,38 +1,51 @@
 <template>
-    <ion-modal ref="modal" :is-open="showModal" @ionModalDidDismiss="dismissModal">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ isEditing ? 'Erinnerung bearbeiten' : 'Erinnerung hinzufügen' }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="dismissModal">Schließen</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-  
-      <ion-content>
-        <ion-item>
-          <ion-label position="stacked">Erinnerung</ion-label>
-          <ion-input v-model="reminder.text" placeholder="Erinnerungstext eingeben"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label position="stacked">Datum</ion-label>
-          <ion-button expand="full" @click="selectDate">Datum auswählen</ion-button>
-          <ion-label>{{ formattedDate }}</ion-label>
-        </ion-item>
-        <ion-item>
-          <ion-label position="stacked">Uhrzeit</ion-label>
-          <ion-button expand="full" @click="selectTime">Uhrzeit auswählen</ion-button>
-          <ion-label>{{ formattedTime }}</ion-label>
-        </ion-item>
-        <ion-button expand="full" @click="saveReminder">{{ isEditing ? 'Speichern' : 'Hinzufügen' }}</ion-button>
-      </ion-content>
-    </ion-modal>
-  </template>
+  <ion-modal ref="modal" :is-open="showModal" @ionModalDidDismiss="dismissModal" class="custom-modal">
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="end">
+          <ion-button @click="dismissModal" color="primary">Schließen</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="ion-padding">
+      <!-- Erinnerungstext -->
+      <ion-item lines="full" class="spaced-item">
+        <ion-label position="stacked" class="label-large">Erinnerung</ion-label>
+        <ion-input v-model="reminder.text" placeholder="Erinnerungstext eingeben" clear-input></ion-input>
+      </ion-item>
+
+      <!-- Datum -->
+      <ion-item lines="none" class="spaced-item" detail-none>
+        <ion-label position="stacked" class="label-large">Datum</ion-label>
+        <div class="datetime-container">
+          <ion-button expand="block" @click="selectDate" color="light">Datum auswählen</ion-button>
+          <ion-label class="datetime-label">{{ formattedDate ? formatDate(formattedDate) : 'Kein Datum ausgewählt' }}</ion-label>
+        </div>
+      </ion-item>
+
+      <!-- Uhrzeit -->
+      <ion-item lines="none" class="spaced-item" detail-none>
+        <ion-label position="stacked" class="label-large">Uhrzeit</ion-label>
+        <div class="datetime-container">
+          <ion-button expand="block" @click="selectTime" color="light">Uhrzeit auswählen</ion-button>
+          <ion-label class="datetime-label">{{ formattedTime ? formattedTime : 'Keine Uhrzeit ausgewählt' }}</ion-label>
+        </div>
+      </ion-item>
+
+      <!-- Speichern/Hinzufügen Button -->
+      <ion-button expand="block" @click="saveReminder" shape="round">
+        {{ isEditing ? 'Speichern' : 'Hinzufügen' }}
+      </ion-button>
+    </ion-content>
+  </ion-modal>
+</template>
   
   <script setup lang="ts">
   import { ref, watch, defineProps, defineEmits } from 'vue';
-  import { IonInput, IonHeader, IonToolbar, IonTitle, IonContent, IonItem, IonLabel, IonButton} from '@ionic/vue';
+  import { IonInput, IonHeader, IonToolbar, IonTitle, IonContent, IonItem, IonLabel, IonButton, alertController} from '@ionic/vue';
   import { DatetimePicker } from '@capawesome-team/capacitor-datetime-picker';
+  import { formatDate } from '@/utils/dateUtils'; 
   
   interface Reminder {
     id: number;
@@ -116,7 +129,17 @@
     emit('dismiss');
   };
   
-  const saveReminder = () => {
+  const saveReminder = async () => {
+    if(!reminder.value.text.trim()) {
+      const alert = await alertController.create({
+        header: 'Beschreibung erforderlich',
+        message: 'Bitte geben Sie einen Erinnerungstext ein, bevor Sie die Erinnerung speichern.',
+        buttons: ['OK']
+      });
+      await alert.present();
+      return;
+    }
+
     if (!props.isEditing) {
       reminder.value.id = generateReminderId();
     }
@@ -126,5 +149,55 @@
   </script>
   
   <style scoped>
-  </style>
-  
+  .custom-modal {
+    --height: 80%;
+    --min-height: 80%;
+    --border-radius: 15px;
+  }
+
+  .ion-padding {
+    padding-bottom: 30px;
+  }
+
+  .spaced-item {
+    margin-bottom: 20px;
+  }
+
+  ion-item {
+    --inner-padding-end: 0;
+    --padding-start: 20px;
+    --border-color: #E5E5EA;
+    font-size: 18px;
+  }
+
+  .label-large {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .datetime-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .datetime-label {
+    font-size: 16px;
+    color: #6b6b6b;
+  }
+
+  ion-input {
+    --padding-start: 0;
+    --padding-end: 0;
+    font-size: 19px;
+    padding: 12px;
+  }
+
+  ion-button {
+    --background: linear-gradient(135deg, #3A2FDF, #6146D9, #8B2FC0, #B52B9C, #D93875);
+    --color: white;
+    font-size: 18px;
+    --padding: 16px 0;
+  }
+</style>
